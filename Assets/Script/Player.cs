@@ -1,79 +1,109 @@
 using UnityEngine;
-using UnityEngine.InputSystem; // ← namespace novo obrigatório!
+using UnityEngine.InputSystem;
 
 public class Player : MonoBehaviour
 {
-    [Range(0, 10)] public int velocidade;
-    Rigidbody2D rig;
+    [Header("Movimento")]
+    [Range(0, 10)]
+    public float velocidade = 5f;
 
-    // Referência à câmera (igual antes)
+    private Rigidbody2D rig;
+
+    [Header("Câmera")]
     public Camera cameraDoJogo;
 
-    // Variáveis do tiro (igual antes)
+    [Header("Tiro")]
     public GameObject laser;
     public Transform disparo;
     public AudioSource somLazer;
     public GameController controller;
 
-    // ===== NOVO INPUT SYSTEM =====
-    // Criamos variáveis do tipo InputAction para cada ação
-    private InputAction moverAction;    // vai substituir Input.GetAxis
-    private InputAction atirarAction;   // vai substituir Input.GetButtonDown
+    // Classe gerada pelo Input System
+    private InputSystem_Actions inputActions;
+
+    // Guarda a direção lida no Update
+    private Vector2 direcao;
 
     void Awake()
     {
-        // Aqui conectamos nossas variáveis às ações que existem
-        // no InputSystem_Actions (aquele arquivo criado no passo 3)
-        // "Player/Move" = Action Map "Player", ação "Move"
-        moverAction = InputSystem.actions.FindAction("Player/Move");
-        atirarAction = InputSystem.actions.FindAction("Player/Attack");
-    }
-
-    void Start()
-    {
         rig = GetComponent<Rigidbody2D>();
         somLazer = GetComponent<AudioSource>();
+
+        if (cameraDoJogo == null)
+        {
+            cameraDoJogo = Camera.main;
+        }
+
+        // Cria uma instância da classe gerada
+        inputActions = new InputSystem_Actions();
+    }
+
+    void OnEnable()
+    {
+        // Habilita o Action Map Player
+        inputActions.Player.Enable();
+    }
+
+    void OnDisable()
+    {
+        // Desabilita quando o objeto for desligado
+        inputActions.Player.Disable();
     }
 
     void Update()
     {
-        mover();
-        disparar();
+        // Lê o movimento no Update
+        direcao = inputActions.Player.Move.ReadValue<Vector2>();
+
+        GirarParaMouse();
+        Disparar();
     }
 
-    void mover()
+    void FixedUpdate()
     {
-        // ANTES: Input.GetAxis("Horizontal") e Input.GetAxis("Vertical")
-        // AGORA: lemos um Vector2 direto da ação "Move"
-        Vector2 direcao = moverAction.ReadValue<Vector2>();
-        rig.linearVelocity = direcao * velocidade;
+        // Movimento físico fica no FixedUpdate
+        Mover();
+    }
 
-        // ANTES: Input.mousePosition
-        // AGORA: Mouse.current.position (precisa do using UnityEngine.InputSystem)
+    void Mover()
+    {
+        rig.linearVelocity = direcao * velocidade;
+    }
+
+    void GirarParaMouse()
+    {
+        // Evita erro caso o jogo esteja sem mouse detectado
+        if (Mouse.current == null || cameraDoJogo == null)
+            return;
+
         Vector2 posicaoMouse = cameraDoJogo.ScreenToWorldPoint(
             Mouse.current.position.ReadValue()
         );
 
         Vector2 distancia = posicaoMouse - rig.position;
+
         float anguloMira = Mathf.Atan2(distancia.y, distancia.x) * Mathf.Rad2Deg;
-        rig.rotation = anguloMira;
+
+        // Melhor para Rigidbody2D do que alterar rig.rotation direto
+        rig.SetRotation(anguloMira);
     }
 
-    void disparar()
+    void Disparar()
     {
-        // ANTES: Input.GetButtonDown("Fire1")
-        // AGORA: WasPressedThisFrame() — verifica se apertou neste frame
-        if (atirarAction.WasPressedThisFrame())
+        if (inputActions.Player.Attack.WasPressedThisFrame())
         {
             Instantiate(laser, disparo.position, disparo.rotation);
-            somLazer.Play();
+
+            if (somLazer != null)
+            {
+                somLazer.Play();
+            }
         }
     }
 
     void OnTriggerEnter2D(Collider2D bateu)
     {
-        // Esse trecho NÃO muda! Colisão não tem nada a ver com input
-        if (bateu.gameObject.tag == "x")
+        if (bateu.gameObject.CompareTag("x"))
         {
             transform.position = new Vector3(
                 transform.position.x * -0.9f,
@@ -81,7 +111,8 @@ public class Player : MonoBehaviour
                 transform.position.z
             );
         }
-        if (bateu.gameObject.tag == "y")
+
+        if (bateu.gameObject.CompareTag("y"))
         {
             transform.position = new Vector3(
                 transform.position.x,

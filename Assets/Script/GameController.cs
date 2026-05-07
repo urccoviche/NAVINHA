@@ -1,43 +1,147 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
-
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class GameController : MonoBehaviour
-{   
+{
     [Header("Asteroide")]
-    //variaveis para o astereid
-    public Transform[] pontoOrigem; //o colchetes gera um conjunto de dados do mesmo tipo , inicia com 0 zero 
+    public Transform[] pontoOrigem;
     public GameObject asteroid;
-    //variveis que definirão o intervalo de criação
-    public float timer; //armazena o tempo do ultimo objeto Criado
-    public float intervaloTempo; // vamos definir o intervalo entre a criação dos objetos
+    public float timer;
+    public float intervaloTempo = 2f;
+
     [Header("Pontuação")]
-    public int pontos; //armazenar os pontos
-    public TextMeshProUGUI txtPontos; // exibir a pontuação na tela, using TMPro
-    // Start is called before the first frame update
+    public int pontos;
+    public TextMeshProUGUI txtPontos;
+
+    [Header("Sistema de Vida")]
+    public int vidaMaxima = 5;
+    public int vidaAtual;
+    public Slider sliderVida;
+
+    [Header("Tela de Game Over")]
+    public GameObject telaGameOver;
+
+    private bool jogoAcabou = false;
+
     void Start()
     {
-        timer=intervaloTempo;
-    }
+        Time.timeScale = 1f;
 
-    // Update is called once per frame
-    void Update()
-    {
-        criaAsteroides();
-    }
-    void criaAsteroides(){
-        timer -= Time.deltaTime; // contagem regressiva do tempo
-        if (timer <=0){ // verifica se acabou o tempo
-            int pontoAleatorio=Random.Range(0, pontoOrigem.Length -1); // cria um numero aleatorio entre zero e posição do array
-            Instantiate(asteroid, pontoOrigem[pontoAleatorio].position, pontoOrigem[pontoAleatorio].rotation); // criando nosso asteroid
-            timer=intervaloTempo; // reset do valor do time , para o valor original
+        timer = intervaloTempo;
+
+        vidaAtual = vidaMaxima;
+
+        AtualizarSliderVida();
+        AtualizarTextoPontos();
+
+        if (telaGameOver != null)
+        {
+            telaGameOver.SetActive(false);
         }
     }
-     public void recebePontos(int recebe){
-        pontos +=recebe;
-        txtPontos.text="Pontos : " + pontos;
-     }
 
+    void Update()
+    {
+        if (jogoAcabou == false)
+        {
+            CriarAsteroides();
+        }
+    }
+
+    void CriarAsteroides()
+    {
+        timer -= Time.deltaTime;
+
+        if (timer <= 0)
+        {
+            if (pontoOrigem.Length > 0 && asteroid != null)
+            {
+                // Correção importante:
+                // Random.Range com int já exclui o último valor automaticamente.
+                int pontoAleatorio = Random.Range(0, pontoOrigem.Length);
+
+                Instantiate(
+                    asteroid,
+                    pontoOrigem[pontoAleatorio].position,
+                    pontoOrigem[pontoAleatorio].rotation
+                );
+            }
+
+            timer = intervaloTempo;
+        }
+    }
+
+    public void recebePontos(int recebe)
+    {
+        if (jogoAcabou == true)
+        {
+            return;
+        }
+
+        pontos += recebe;
+        AtualizarTextoPontos();
+    }
+
+    public void PerderVida(int dano)
+    {
+        if (jogoAcabou == true)
+        {
+            return;
+        }
+
+        vidaAtual -= dano;
+
+        if (vidaAtual < 0)
+        {
+            vidaAtual = 0;
+        }
+
+        AtualizarSliderVida();
+
+        if (vidaAtual <= 0)
+        {
+            GameOver();
+        }
+    }
+
+    void AtualizarSliderVida()
+    {
+        if (sliderVida != null)
+        {
+            sliderVida.maxValue = vidaMaxima;
+            sliderVida.value = vidaAtual;
+        }
+    }
+
+    void AtualizarTextoPontos()
+    {
+        if (txtPontos != null)
+        {
+            txtPontos.text = "Pontos: " + pontos;
+        }
+    }
+
+    void GameOver()
+    {
+        jogoAcabou = true;
+
+        if (telaGameOver != null)
+        {
+            telaGameOver.SetActive(true);
+        }
+
+        // Pausa o jogo
+        Time.timeScale = 0f;
+    }
+
+    public void ReiniciarPartida()
+    {
+        Time.timeScale = 1f;
+
+        SceneManager.LoadScene(
+            SceneManager.GetActiveScene().buildIndex
+        );
+    }
 }
